@@ -39,31 +39,11 @@ import com.anoop.javafun.MovieList.Movie;
  *   
  */
 
-public class ArtistPairIntegerSet {
+public class ArtistPairIntegerSet extends ArtistPair {
 
-	private class ArtistPairCount {
-		String artist1;
-		String artist2;
-		Integer count;
-		
-		ArtistPairCount(String artist1, String artist2, Integer count) {
-			this.artist1 = artist1;
-			this.artist2 = artist2;
-			this.count = count;
-		}
-	}
-	
-	// this map stores the lowercase representations of name to original names
-	// we convert all name to lower case for comparison purposes to avoid issues with mixed case name
-	// of the same artist later in the file
-	// this map will hold the lower case map to LAST occurence of artist name in file when the name is printed
-	Map<String, String> lcaseToNameMap = new HashMap<String, String>();
-	
 	// this map hold the number of instances seen so far for a given pair. The key of the container map is
 	// alphabatically earlier to the key in value map. This ordering avoids duplicate pairs
 	Map<String, Set<Integer>> artistIntegerSetMap = new HashMap<String, Set<Integer>>();
-	
-	int numLines = 0;
 	
 	/*
 	 * this method with parse the file and print the results of the opearion on command line
@@ -81,17 +61,10 @@ public class ArtistPairIntegerSet {
 	 * this funtion parses the given line and updates all the maps with artist maps, 
 	 * result set map as needed and the pairsetMap
 	 */
-	private void parseLine(String line, int lineNum){
-		String[] artists = line.split(",");
+	protected void parseLine(String line){
+		int lineNum = this.currentLineNumber;
 		
-		for (int i = 0; i < artists.length; i++){
-			String lcase = artists[i].trim().toLowerCase();
-			
-			if (lcase.length() > 0){
-				this.lcaseToNameMap.put(lcase, artists[i]);
-				artists[i] = lcase;
-			}
-		}
+		String[] artists = super.populateArtistNameMap(line);
 		
 		// loop over all the artists
 		for (int i = 0; i < artists.length; i++){
@@ -112,35 +85,7 @@ public class ArtistPairIntegerSet {
 		}
 	}
 	
-	/*
-	 * Iterate over the result set to print the results
-	 */
-	private void printResults(String outFileName, List<ArtistPairCount> apcList) throws IOException{
-		// we are simply printing the counts for all the pairs in result set.
-		// ofcourse we can get fancier and do sorting by names and counts etc. but avoiding that now
-		
-		apcList.sort(new Comparator<ArtistPairCount>() {
-			@Override
-			public int compare(ArtistPairCount o1, ArtistPairCount o2) {
-				return o2.count - o1.count;
-			}
-		});
-		
-		Path path = FileSystems.getDefault().getPath(outFileName);
-		BufferedWriter writer = Files.newBufferedWriter(path);
-		
-		for (ArtistPairCount apc : apcList){
-			writer.write(String.format("%s, %s : %d", apc.artist1, apc.artist2, apc.count));
-			writer.newLine();
-		}
-		
-		writer.flush();
-		writer.close();
-	}
-	
-	private List<ArtistPairCount> getArtistPairCountList() {
-		List<ArtistPairCount> apcList = new ArrayList<ArtistPairCount>();
-		
+    protected void populateArtistPairCountList(){		
 		String[] keys = this.artistIntegerSetMap.keySet().toArray(new String[this.artistIntegerSetMap.keySet().size()]);
 		
 		Arrays.sort(keys);
@@ -185,35 +130,6 @@ public class ArtistPairIntegerSet {
 		System.out.println("time in integer set intersection = " + bitsetTime);
 		System.out.println("time in innerloop = " + innerLoopTime);
 		System.out.println("Total time in bitset comparison = " + total);
-		return apcList;
-	}
-	
-	public void parseFileAndPrintResults(String inFileName, String outFileName) throws IOException{
-		Path path = FileSystems.getDefault().getPath(inFileName);
-		if (java.nio.file.Files.exists(path) == false){
-			System.out.println("file does not exist");
-			return;
-		}
-		
-		long start = System.currentTimeMillis();
-		String line = "";
-		int lineNum = 0;
-		BufferedReader reader = Files.newBufferedReader(path);
-		while ((line = reader.readLine()) != null){
-			this.parseLine(line, lineNum);
-			lineNum++;
-		}
-		
-		this.numLines = lineNum;
-		
-		reader.close();
-		
-		List<ArtistPairCount> apcList = getArtistPairCountList();
-		
-		long total = System.currentTimeMillis() - start;
-		System.out.println("Total Time - " + total);
-		
-		printResults(outFileName, apcList);
 	}
 	
 	/**
@@ -223,19 +139,8 @@ public class ArtistPairIntegerSet {
 	 * @throws IOException 
 	 */
 	public static void main(String[] args) throws IOException {
-		// TODO Auto-generated method stub
-		if (args.length < 2){
-			System.out.println("Usage : com.anoop.javafun.ArtistPairBitset <fully qualified input filename> <fully qualified output filename>");
-			System.exit(0);
-		}
-		
-		String fileName = args[0];
-		
-		ArtistPairIntegerSet apm = new ArtistPairIntegerSet();
-		apm.parseFileAndPrintResults(fileName, args[1]);
-
-		System.out.println("processed file " + fileName);
-		System.out.println("output file " + args[1]);
+		ArtistPairIntegerSet apis = new ArtistPairIntegerSet();
+		apis.process(args);
 	}
 
 }

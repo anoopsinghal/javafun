@@ -25,17 +25,22 @@ public class RollingString {
 		int upperBound = (int)'z';
 		while (index <= endIndex && index < strArray.length){
 			char chr = strArray[index];
-			int ascii = (int)chr + direction;
+			int ascii = (int)chr;
 			
-			if (ascii < lowerBound){
-				ascii = upperBound;
+			if (ascii >= lowerBound && ascii <= upperBound) {
+				
+				ascii += direction;
+				if (ascii < lowerBound){
+					ascii = upperBound;
+				}
+				
+				if (ascii > upperBound) {
+					ascii = lowerBound;
+				}
+				
+				strArray[index] = (char)ascii;
 			}
 			
-			if (ascii > upperBound) {
-				ascii = lowerBound;
-			}
-			
-			strArray[index] = (char)ascii;
 			index++;
 		}
 		
@@ -63,6 +68,7 @@ public class RollingString {
 		if (args.length < 2){
 			System.out.println("Usage : com.anoop.javafun.RollingString <str to role> <op1> <op2> ... ");
 			System.out.println("         op - <start index> <end index> R or L");
+			System.out.println("         characters between 'a' and 'z' will be rolled. rest will be ignored");
 			System.exit(0);
 		}
 		

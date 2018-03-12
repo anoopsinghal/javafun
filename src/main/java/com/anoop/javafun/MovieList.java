@@ -52,7 +52,7 @@ public class MovieList {
 
 		List<Movie> movies = new ArrayList<Movie>();
 		
-		Gson gson = new GsonBuilder().create();
+		Gson gson = new Gson();
 		while (pageNum <= totalPages){
 			String urlStr = String.format("https://jsonmock.hackerrank.com/api/movies/search/?Title=%s&page=%d", subStr, pageNum);
 
@@ -83,7 +83,6 @@ public class MovieList {
 
 		List<Movie> movies = getMovies(args[0]);
 		movies.sort(new Comparator<Movie>() {
-			@Override
 			public int compare(Movie o1, Movie o2) {
 				if (o1.Year.intValue() == o2.Year.intValue()){
 					return o2.Title.compareTo(o1.Title);

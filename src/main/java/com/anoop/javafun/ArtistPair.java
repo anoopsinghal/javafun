@@ -12,7 +12,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,19 +35,23 @@ import com.anoop.javafun.MovieList.Movie;
  * For example, in the above sample, Radiohead and Morrissey appear together twice, but every other pair appears only once. Your solution should be a cvs, with each row being a pair. For example:
  * Morrissey,Radiohead\n
  *
- * This class uses bitsets to track the lines for an artist This is useful when the number of users is small
- * This class has a huge cost in cloning the bitmap before doing an "and" operation to get common lines for the artist. 
- *   
+ * This class uses maps to track the pairing count. This is useful when the number of users is large since number of artists is 
+ * relatively small
  */
+public abstract class ArtistPair {
 
-public class ArtistPairBitset {
-
-	private class ArtistPairCount {
+	protected class ArtistPairCount {
 		String artist1;
 		String artist2;
 		Integer count;
 		
-		ArtistPairCount(String artist1, String artist2, Integer count) {
+		ArtistPairCount(String artist1, String artist2) {
+			this.artist1 = artist1;
+			this.artist2 = artist2;
+			this.count = 0;
+		}
+		
+		ArtistPairCount(String artist1, String artist2, int count) {
 			this.artist1 = artist1;
 			this.artist2 = artist2;
 			this.count = count;
@@ -61,12 +64,15 @@ public class ArtistPairBitset {
 	// this map will hold the lower case map to LAST occurence of artist name in file when the name is printed
 	Map<String, String> lcaseToNameMap = new HashMap<String, String>();
 	
-	// this map hold the number of instances seen so far for a given pair. The key of the container map is
-	// alphabatically earlier to the key in value map. This ordering avoids duplicate pairs
-	Map<String, BitSet> artistBitsetMap = new HashMap<String, BitSet>();
+	protected Integer minimumCount;
 	
-	int numLines = 0;
+	protected List<ArtistPairCount> apcList = new ArrayList<ArtistPairCount>();
+	protected Integer currentLineNumber;
 	
+	// pure virtual method
+    protected abstract void parseLine(String line);
+    protected abstract void populateArtistPairCountList();
+    			
 	/*
 	 * this method with parse the file and print the results of the opearion on command line
 	 * basic algorithm :
@@ -83,47 +89,43 @@ public class ArtistPairBitset {
 	 * this funtion parses the given line and updates all the maps with artist maps, 
 	 * result set map as needed and the pairsetMap
 	 */
-	private void parseLine(String line, int lineNum){
+	protected String[] populateArtistNameMap(String line){
 		String[] artists = line.split(",");
 		
 		for (int i = 0; i < artists.length; i++){
 			String lcase = artists[i].trim().toLowerCase();
-			
-			if (lcase.length() > 0){
-				this.lcaseToNameMap.put(lcase, artists[i]);
-				artists[i] = lcase;
-			}
+			this.lcaseToNameMap.put(lcase, artists[i]);
+			artists[i] = lcase;
 		}
 		
-		// loop over all the artists
-		for (int i = 0; i < artists.length; i++){
-			String iArtist = artists[i];
-			
-			if (iArtist.length() == 0){
-				continue;
-			}
-			
-			// find the map of second artists to count
-			BitSet bitset = (this.artistBitsetMap.containsKey(iArtist)) ? this.artistBitsetMap.get(iArtist)
-																				: new BitSet();
-			
-			bitset.set(lineNum);
-			
-			// update the map for this artist
-			this.artistBitsetMap.put(iArtist, bitset);
-		}
+		// sort the list of artists upfront, a n log n operation
+		// we can force alphabetical order in partSetMap instead of sorting as we traverse the array
+		// that will be O(n square) comparisons
+		Arrays.sort(artists);
+		
+		return artists;
 	}
 	
 	/*
 	 * Iterate over the result set to print the results
 	 */
-	private void printResults(String outFileName, List<ArtistPairCount> apcList) throws IOException{
+	protected void printResults(String outFileName) throws IOException{
 		// we are simply printing the counts for all the pairs in result set.
 		// ofcourse we can get fancier and do sorting by names and counts etc. but avoiding that now
 		
+		this.populateArtistPairCountList();
 		apcList.sort(new Comparator<ArtistPairCount>() {
-			@Override
 			public int compare(ArtistPairCount o1, ArtistPairCount o2) {
+				if (o2.count == o1.count){
+					int artistComp = o2.artist1.compareTo(o1.artist1);
+					
+					if (artistComp == 0){
+						artistComp = o2.artist2.compareTo(o1.artist2);						
+					}
+					
+					return artistComp;
+				}
+				
 				return o2.count - o1.count;
 			}
 		});
@@ -140,82 +142,24 @@ public class ArtistPairBitset {
 		writer.close();
 	}
 	
-	private List<ArtistPairCount> getArtistPairCountList() {
-		List<ArtistPairCount> apcList = new ArrayList<ArtistPairCount>();
-		
-		String[] keys = this.artistBitsetMap.keySet().toArray(new String[this.artistBitsetMap.keySet().size()]);
-		
-		Arrays.sort(keys);
-		long start = System.currentTimeMillis();
-		int bitsetTime = 0;
-		int innerLoopTime = 0;
-		int bitsetGetTime = 0;
-		
-		for (int i = 0; i < keys.length; i++){
-			String iArtist = keys[i];
-			BitSet iSet = this.artistBitsetMap.get(keys[i]);
-			String iArtistOrigName = this.lcaseToNameMap.get(iArtist);
-			long innerLoopStart = System.currentTimeMillis();
-			for (int j = i + 1; j < keys.length; j++){
-				long beforeBitSet = System.currentTimeMillis();
-				String jArtist = keys[j];
-				BitSet jSet = this.artistBitsetMap.get(keys[j]);
-				
-				bitsetGetTime += (System.currentTimeMillis() - beforeBitSet);
-				beforeBitSet = System.currentTimeMillis();
-				BitSet newSet = new BitSet();
-				newSet.or(jSet);
-				
-				newSet.and(iSet);
-				
-				int count = newSet.cardinality();
-				
-				bitsetTime += (System.currentTimeMillis() - beforeBitSet);
-				
-				if (count > 0) {
-					ArtistPairCount apc = new ArtistPairCount(iArtistOrigName,  this.lcaseToNameMap.get(jArtist), count);
-					apcList.add(apc);
-				}
-			}
-			
-			innerLoopTime += (System.currentTimeMillis() - innerLoopStart);
-			
-		}
-		
-		long total = System.currentTimeMillis() - start;
-		System.out.println("time in bitset get = " + bitsetGetTime);
-		System.out.println("time in bitset comparison = " + bitsetTime);
-		System.out.println("time in innerloop = " + innerLoopTime);
-		System.out.println("Total time in bitset comparison = " + total);
-		return apcList;
-	}
-	
-	public void parseFileAndPrintResults(String inFileName, String outFileName) throws IOException{
+	protected void parseFileAndPrintResults(String inFileName, String outFileName) throws IOException{
 		Path path = FileSystems.getDefault().getPath(inFileName);
 		if (java.nio.file.Files.exists(path) == false){
 			System.out.println("file does not exist");
 			return;
 		}
 		
-		long start = System.currentTimeMillis();
 		String line = "";
-		int lineNum = 0;
 		BufferedReader reader = Files.newBufferedReader(path);
+		
+		this.currentLineNumber = 0;
 		while ((line = reader.readLine()) != null){
-			this.parseLine(line, lineNum);
-			lineNum++;
+			this.currentLineNumber++;
+			this.parseLine(line);
 		}
-		
-		this.numLines = lineNum;
-		
 		reader.close();
 		
-		List<ArtistPairCount> apcList = getArtistPairCountList();
-		
-		long total = System.currentTimeMillis() - start;
-		System.out.println("Total Time - " + total);
-		
-		printResults(outFileName, apcList);
+		printResults(outFileName);		
 	}
 	
 	/**
@@ -224,17 +168,18 @@ public class ArtistPairBitset {
 	 * second parameter is number on minimum matches
 	 * @throws IOException 
 	 */
-	public static void main(String[] args) throws IOException {
+	protected void process(String[] args) throws IOException {
 		// TODO Auto-generated method stub
-		if (args.length < 2){
-			System.out.println("Usage : com.anoop.javafun.ArtistPairBitset <fully qualified input filename> <fully qualified output filename>");
+		if (args.length < 3){
+			System.out.println("Usage : com.anoop.javafun.ArtistPairMap <fully qualified input filename> <fully qualified output filename> <min match count>");
 			System.exit(0);
 		}
 		
 		String fileName = args[0];
 		
-		ArtistPairBitset apm = new ArtistPairBitset();
-		apm.parseFileAndPrintResults(fileName, args[1]);
+		this.minimumCount = Integer.parseInt(args[2]);
+		
+		this.parseFileAndPrintResults(fileName, args[1]);
 
 		System.out.println("processed file " + fileName);
 		System.out.println("output file " + args[1]);
